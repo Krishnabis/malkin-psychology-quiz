@@ -135,7 +135,7 @@ export default function QuizPage() {
   const [showHalfway, setShowHalfway] = useState(false);
   const [halfwayShown, setHalfwayShown] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [questionStartTime, setQuestionStartTime] = useState(Date.now());
+  const questionStartRef = useRef<number>(Date.now()); // real wall-clock start per question
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const hintTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -145,9 +145,11 @@ export default function QuizPage() {
       router.replace('/');
       return;
     }
+    // Ensure new field exists for sessions started before this update
+    if (!s.questionTimeTaken) s.questionTimeTaken = {};
     setSession(s);
     setTimeLeft(QUESTION_TIME);
-    setQuestionStartTime(Date.now());
+    questionStartRef.current = Date.now();
   }, [router]);
 
   // Timer
@@ -210,16 +212,28 @@ export default function QuizPage() {
     setShowResult(true);
   };
 
+  const handleShowHint = () => {
+    if (!hintUnlocked || !session || !currentQuestion) return;
+    // Mark hint as taken in session
+    const updatedHintShown = { ...session.hintShown, [currentQuestion.id]: true };
+    const updatedSession = { ...session, hintShown: updatedHintShown };
+    saveSession(updatedSession);
+    setSession(updatedSession);
+    setShowHint(!showHint);
+  };
+
   const handleNext = () => {
     if (!session || !currentQuestion) return;
 
-    const timeTaken = Math.min(QUESTION_TIME - timeLeft, QUESTION_TIME);
+    // Compute actual wall-clock seconds spent on this question
+    const elapsed = Math.round((Date.now() - questionStartRef.current) / 1000);
+    const actualTimeTaken = Math.min(elapsed, QUESTION_TIME);
     const actualSelected = selectedOption !== null ? selectedOption : -1;
-    const isCorrect = actualSelected === currentQuestion.correctIndex;
 
-    // Update session with this answer
+    // Persist per-question time in session
+    const updatedTimeTaken = { ...(session.questionTimeTaken ?? {}), [currentQuestion.id]: actualTimeTaken };
     const updatedAnswers = { ...session.answers, [currentQuestion.id]: actualSelected };
-    
+
     const nextIndex = currentIndex + 1;
 
     // Check halfway
@@ -230,18 +244,23 @@ export default function QuizPage() {
     }
 
     if (nextIndex >= totalQuestions) {
-      // Quiz complete
-      const updatedSession = { ...session, answers: updatedAnswers };
-      
-      // Calculate results
-      const results: AttemptResult[] = updatedSession.questionIds.map(qId => {
+      // Quiz complete — build final session snapshot
+      const finalSession: QuizSession = {
+        ...session,
+        answers: updatedAnswers,
+        questionTimeTaken: updatedTimeTaken,
+      };
+
+      // Build AttemptResult for every question
+      const results: AttemptResult[] = finalSession.questionIds.map(qId => {
         const q = questions.find(q => q.id === qId)!;
-        const sel = updatedAnswers[qId] ?? -1;
+        const sel = finalSession.answers[qId] ?? -1;
         return {
           questionId: qId,
           selectedIndex: sel,
           isCorrect: sel === q.correctIndex,
-          timeTaken: QUESTION_TIME,
+          timeTaken: finalSession.questionTimeTaken[qId] ?? QUESTION_TIME,
+          hintTaken: finalSession.hintShown[qId] === true,
         };
       });
 
@@ -257,7 +276,7 @@ export default function QuizPage() {
         duration,
         allowRepeats: true,
       });
-      
+
       clearSession();
       router.push('/results');
       return;
@@ -267,6 +286,7 @@ export default function QuizPage() {
       ...session,
       currentIndex: nextIndex,
       answers: updatedAnswers,
+      questionTimeTaken: updatedTimeTaken,
     };
     saveSession(updatedSession);
     setSession(updatedSession);
@@ -275,7 +295,7 @@ export default function QuizPage() {
     setShowHint(false);
     setHintUnlocked(false);
     setTimeLeft(QUESTION_TIME);
-    setQuestionStartTime(Date.now());
+    questionStartRef.current = Date.now();
   };
 
   if (!session || !currentQuestion) {
@@ -389,7 +409,7 @@ export default function QuizPage() {
           
           {/* Hint button */}
           <button
-            onClick={() => hintUnlocked && setShowHint(!showHint)}
+            onClick={handleShowHint}
             style={{
               background: hintUnlocked ? (showHint ? '#FFE8A3' : '#FFF4CC') : '#F5F0FF',
               border: 'none',

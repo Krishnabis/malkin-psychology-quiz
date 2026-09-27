@@ -7,69 +7,119 @@ import { questions } from '@/lib/questions';
 import { getAttempts } from '@/lib/storage';
 import { QuizAttempt } from '@/lib/types';
 
+function formatSecs(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
 function generatePDFContent(attempt: QuizAttempt): string {
   const pct = Math.round((attempt.score / attempt.totalQuestions) * 100);
   const date = new Date(attempt.date).toLocaleDateString('en-IN', {
     day: '2-digit', month: 'long', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
+  const scoreColor = pct >= 70 ? '#2D6B52' : pct >= 50 ? '#8B6914' : '#6B2D3F';
+  const scoreBg    = pct >= 70 ? '#D6F5EA' : pct >= 50 ? '#FFF4CC' : '#FFE8EC';
 
-  let html = `
-<!DOCTYPE html>
+  let html = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
+<title>Malkin's Psychology NET Quiz — Result</title>
 <style>
-  body { font-family: Arial, sans-serif; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
-  h1 { color: #C8B4E8; text-align: center; }
-  .header { text-align: center; margin-bottom: 30px; }
-  .score { font-size: 48px; font-weight: bold; color: ${pct >= 70 ? '#4CAF50' : pct >= 50 ? '#FF9800' : '#F44336'}; }
-  .question { border: 1px solid #E0D8F0; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
-  .correct { border-color: #B4E8D4; background: #F0FFF8; }
-  .incorrect { border-color: #FFB7C5; background: #FFF0F3; }
-  .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
-  .badge-correct { background: #B4E8D4; color: #2D6B52; }
-  .badge-incorrect { background: #FFB7C5; color: #6B2D3F; }
-  .hint { background: #FFF4CC; border: 1px solid #FFE8A3; border-radius: 8px; padding: 10px; margin-top: 8px; font-size: 13px; }
-  .answer-text { font-weight: bold; color: #2D6B52; }
-  .selected-wrong { font-weight: bold; color: #6B2D3F; text-decoration: line-through; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #333; max-width: 850px; margin: 0 auto; padding: 24px 20px; background: #fafafa; }
+  .header { text-align: center; margin-bottom: 28px; padding: 24px; background: white; border-radius: 16px; box-shadow: 0 2px 12px rgba(200,180,232,0.2); }
+  .header h1 { font-size: 22px; color: #7B6A9E; margin-bottom: 4px; }
+  .header .date { font-size: 13px; color: #999; margin-bottom: 16px; }
+  .score-badge { display: inline-block; font-size: 52px; font-weight: 900; color: ${scoreColor}; background: ${scoreBg}; padding: 8px 32px; border-radius: 50px; margin-bottom: 12px; }
+  .stats { display: flex; justify-content: center; gap: 32px; font-size: 14px; color: #555; }
+  .stats span { font-weight: bold; color: #333; }
+  .section-title { font-size: 16px; font-weight: 700; color: #7B6A9E; margin: 24px 0 12px; padding-bottom: 6px; border-bottom: 2px solid #E8DEFF; }
+  .q-card { background: white; border-radius: 12px; border-left: 4px solid #ccc; padding: 16px 18px; margin-bottom: 14px; box-shadow: 0 1px 6px rgba(0,0,0,0.06); page-break-inside: avoid; }
+  .q-card.correct { border-left-color: #52B788; }
+  .q-card.incorrect { border-left-color: #E07A8F; }
+  .q-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .q-num { font-size: 12px; font-weight: 700; color: #999; }
+  .badge { font-size: 12px; font-weight: 700; padding: 3px 12px; border-radius: 20px; }
+  .badge.correct { background: #D6F5EA; color: #2D6B52; }
+  .badge.incorrect { background: #FFE8EC; color: #6B2D3F; }
+  .q-text { font-size: 13.5px; line-height: 1.65; color: #333; white-space: pre-line; margin-bottom: 14px; }
+  .q-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .q-field { background: #f7f5ff; border-radius: 8px; padding: 8px 12px; }
+  .q-field.marked-wrong { background: #fff0f3; }
+  .q-field.marked-correct { background: #f0fff8; }
+  .q-field label { display: block; font-size: 10px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+  .q-field .value { font-size: 13px; font-weight: 600; color: #333; }
+  .q-field .value.correct-ans { color: #2D6B52; }
+  .q-field .value.wrong-ans { color: #6B2D3F; text-decoration: line-through; }
+  .meta-row { display: flex; gap: 8px; margin-top: 8px; }
+  .meta-pill { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+  .meta-time { background: #EEF5FF; color: #3A6BC8; }
+  .meta-hint-yes { background: #FFF4CC; color: #8B6914; }
+  .meta-hint-no { background: #F0F0F0; color: #888; }
+  .hint-box { background: #FFF9E6; border: 1px solid #FFE8A3; border-radius: 8px; padding: 10px 12px; margin-top: 10px; font-size: 12.5px; color: #6B5A2D; line-height: 1.5; }
+  @media print {
+    body { padding: 16px; background: white; }
+    .q-card { box-shadow: none; border-left-width: 3px; }
+  }
 </style>
 </head>
 <body>
 <div class="header">
   <h1>🐰 Malkin's Psychology NET Quiz</h1>
-  <p>Date: ${date}</p>
-  <div class="score">${pct}%</div>
-  <p>Score: <strong>${attempt.score} / ${attempt.totalQuestions}</strong></p>
-  <p>Time taken: <strong>${Math.floor(attempt.duration / 60)}m ${attempt.duration % 60}s</strong></p>
+  <div class="date">Attempted: ${date}</div>
+  <div class="score-badge">${pct}%</div>
+  <div class="stats">
+    <div>✅ Correct: <span>${attempt.score}</span></div>
+    <div>❌ Wrong: <span>${attempt.totalQuestions - attempt.score}</span></div>
+    <div>📝 Total: <span>${attempt.totalQuestions}</span></div>
+    <div>⏱️ Duration: <span>${formatSecs(attempt.duration)}</span></div>
+  </div>
 </div>
+
+<div class="section-title">📋 Detailed Question Analysis</div>
 `;
 
-  for (const result of attempt.results) {
+  attempt.results.forEach((result, i) => {
     const q = questions.find(q => q.id === result.questionId);
-    if (!q) continue;
-    
-    const selectedOption = result.selectedIndex >= 0 ? q.options[result.selectedIndex] : 'No answer (time up)';
+    if (!q) return;
+
+    const markedOption  = result.selectedIndex >= 0 ? q.options[result.selectedIndex] : '— No answer (time up) —';
     const correctOption = q.options[q.correctIndex];
-    
+    const timeTaken     = formatSecs(result.timeTaken ?? 120);
+    const hintTaken     = result.hintTaken === true;
+
     html += `
-<div class="question ${result.isCorrect ? 'correct' : 'incorrect'}">
-  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
-    <strong>${q.qNum}</strong>
-    <span class="badge ${result.isCorrect ? 'badge-correct' : 'badge-incorrect'}">
-      ${result.isCorrect ? '✓ Correct' : '✗ Incorrect'}
-    </span>
+<div class="q-card ${result.isCorrect ? 'correct' : 'incorrect'}">
+  <div class="q-header">
+    <span class="q-num">Q${i + 1} &nbsp;•&nbsp; ${q.qNum}</span>
+    <span class="badge ${result.isCorrect ? 'correct' : 'incorrect'}">${result.isCorrect ? '✓ Correct' : '✗ Incorrect'}</span>
   </div>
-  <p style="margin:0 0 10px; font-size:14px; line-height:1.6; white-space:pre-line;">${q.text}</p>
-  ${!result.isCorrect ? `<p>Your answer: <span class="selected-wrong">${selectedOption}</span></p>` : ''}
-  <p>Correct answer: <span class="answer-text">${correctOption}</span></p>
-  ${!result.isCorrect ? `<div class="hint">💡 Hint: ${q.hint}</div>` : ''}
+  <div class="q-text">${q.text}</div>
+  <div class="q-grid">
+    <div class="q-field marked-correct">
+      <label>✅ Correct Answer</label>
+      <div class="value correct-ans">${correctOption}</div>
+    </div>
+    <div class="q-field ${!result.isCorrect ? 'marked-wrong' : 'marked-correct'}">
+      <label>${result.isCorrect ? '✅' : '❌'} Answer Marked</label>
+      <div class="value ${!result.isCorrect ? 'wrong-ans' : 'correct-ans'}">${markedOption}</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <span class="meta-pill meta-time">⏱️ Time: ${timeTaken}</span>
+    <span class="meta-pill ${hintTaken ? 'meta-hint-yes' : 'meta-hint-no'}">${hintTaken ? '💡 Hint used' : '🚫 No hint used'}</span>
+  </div>
+  ${hintTaken ? `<div class="hint-box">💡 <strong>Hint:</strong> ${q.hint}</div>` : ''}
 </div>`;
-  }
+  });
 
   html += `</body></html>`;
   return html;
 }
+
 
 export default function ResultsPage() {
   const router = useRouter();

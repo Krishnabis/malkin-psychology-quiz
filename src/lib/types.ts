@@ -2,7 +2,8 @@ export interface AttemptResult {
   questionId: number;
   selectedIndex: number;
   isCorrect: boolean;
-  timeTaken: number; // seconds
+  timeTaken: number; // seconds spent on this question
+  hintTaken: boolean; // whether the hint was viewed
 }
 
 export interface QuizAttempt {
@@ -21,6 +22,7 @@ export interface QuizSession {
   answers: { [questionId: number]: number }; // questionId -> selected option index
   startTime: number; // Date.now()
   hintShown: { [questionId: number]: boolean };
+  questionTimeTaken: { [questionId: number]: number }; // actual seconds spent per question
 }
 
 export interface AppState {

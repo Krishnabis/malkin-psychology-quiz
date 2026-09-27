@@ -88,6 +88,7 @@ export default function Home() {
       answers: {},
       startTime: Date.now(),
       hintShown: {},
+      questionTimeTaken: {},
     });
 
     router.push('/quiz');
