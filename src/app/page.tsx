@@ -44,6 +44,13 @@ export default function Home() {
     router.push('/quiz');
   };
 
+  const startIncorrectQuiz = () => {
+    if (incorrectQuestions.length === 0) return;
+    const selected = incorrectQuestions.map(q => q.id).sort(() => Math.random() - 0.5);
+    saveSession({ questionIds: selected, currentIndex: 0, answers: {}, startTime: Date.now(), hintShown: {}, questionTimeTaken: {} });
+    router.push('/quiz');
+  };
+
   const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   const fmtDur = (s: number) => s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`;
 
@@ -228,6 +235,19 @@ export default function Home() {
               }}>
                 <ChevronRight size={18} color="white" /> Start Quiz
               </button>
+              
+              {incorrectQuestions.length > 0 && (
+                <button onClick={startIncorrectQuiz} style={{
+                  width: '100%', padding: '14px', marginTop: '10px',
+                  background: '#FFF0F5',
+                  border: '1.5px solid #FFB7C5', borderRadius: '16px', cursor: 'pointer',
+                  fontFamily: 'Nunito, sans-serif', fontWeight: 800, fontSize: '15px',
+                  color: '#E07A9A', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', gap: '8px',
+                }}>
+                  <AlertCircle size={16} /> Test Incorrect Questions ({incorrectQuestions.length})
+                </button>
+              )}
             </div>
 
             {/* Stats (only if data exists) */}
