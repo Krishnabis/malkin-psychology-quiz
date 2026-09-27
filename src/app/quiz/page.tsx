@@ -11,15 +11,67 @@ import { QuizSession, AttemptResult } from '@/lib/types';
 
 const QUESTION_TIME = 120;
 
+function WarningPopup({ onClose }: { onClose: () => void }) {
+  useEffect(() => { const t = setTimeout(onClose, 5000); return () => clearTimeout(t); }, [onClose]);
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(74,63,107,0.25)',
+      backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', zIndex: 100, padding: '24px',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: 'white', borderRadius: '24px', padding: '28px 24px',
+        textAlign: 'center', maxWidth: '300px', width: '100%',
+        animation: 'bounce-in 0.55s cubic-bezier(0.34,1.56,0.64,1)',
+        boxShadow: '0 24px 64px rgba(180,140,220,0.3)',
+        border: '2px solid #F0EBF8',
+      }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: '50%',
+          background: 'linear-gradient(135deg, #FFB7C5, #E07A9A)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 16px',
+          boxShadow: '0 8px 24px rgba(224,122,154,0.4)',
+          animation: 'pulse 2s infinite',
+        }}>
+          <Clock size={32} color="white" />
+        </div>
+        <div style={{
+          fontFamily: 'Nunito, sans-serif', fontWeight: 900, fontSize: '22px',
+          color: '#4A3F6B', marginBottom: '8px',
+        }}>2 Minutes Left!</div>
+        <p style={{
+          fontFamily: 'Nunito, sans-serif', fontWeight: 700, fontSize: '14px',
+          color: '#7B6A9E', lineHeight: 1.5, marginBottom: '20px',
+        }}>
+          Wrap up your final answers, Malkin. You've got this!
+        </p>
+        <button onClick={onClose} style={{
+          width: '100%', padding: '12px',
+          background: '#F5F0FF',
+          border: '1.5px solid #E8DEFF', borderRadius: '12px', cursor: 'pointer',
+          fontFamily: 'Nunito, sans-serif', fontWeight: 800, fontSize: '14px',
+          color: '#7B6A9E',
+        }}>
+          Got it
+        </button>
+      </div>
+      <style>{`@keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }`}</style>
+    </div>
+  );
+}
+
 export default function QuizPage() {
   const router = useRouter();
   const [session, setSession] = useState<QuizSession | null>(null);
   const [timeLeft, setTimeLeft] = useState(0);
   const [showHint, setShowHint] = useState(false);
   const [hintUnlocked, setHintUnlocked] = useState(false);
+  const [showWarning, setShowWarning] = useState(false);
   const questionStartRef = useRef<number>(Date.now());
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const hintTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const warningShownRef = useRef(false);
 
   useEffect(() => {
     const s = getSession();
@@ -69,6 +121,12 @@ export default function QuizPage() {
       const elapsed = Math.floor((Date.now() - session.startTime) / 1000);
       const remaining = Math.max(0, totalTime - elapsed);
       setTimeLeft(remaining);
+
+      if (remaining <= 120 && remaining > 0 && !warningShownRef.current) {
+        warningShownRef.current = true;
+        setShowWarning(true);
+      }
+
       if (remaining <= 0) {
         // Auto submit when time runs out
         const timeSpent = Math.round((Date.now() - questionStartRef.current) / 1000);
@@ -120,6 +178,12 @@ export default function QuizPage() {
     if (dir === 'next') nextIndex++;
 
     if (dir === 'next' && currentIndex === totalQuestions - 1) {
+       const answeredCount = Object.keys(session.answers).length;
+       if (answeredCount < totalQuestions) {
+         if (!confirm(`You still have ${totalQuestions - answeredCount} unanswered question(s). Are you sure you want to submit?`)) {
+           return;
+         }
+       }
        submitQuiz({ ...session, questionTimeTaken: updatedTimeTaken });
        return;
     }
@@ -159,6 +223,8 @@ export default function QuizPage() {
       margin: '0 auto',
       boxSizing: 'border-box',
     }}>
+      {showWarning && <WarningPopup onClose={() => setShowWarning(false)} />}
+
       {/* ── TOP BAR (fixed height) ── */}
       <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
         <button
