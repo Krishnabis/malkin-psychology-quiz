@@ -5,12 +5,13 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
   Home as HomeIcon, BookOpen, XCircle, CheckCircle, Target,
-  Clock, RefreshCw, Trophy, BarChart2, ChevronRight,
+  Clock, RefreshCw, Trophy, BarChart2, ChevronRight, Download,
   Lightbulb, AlertCircle, Star, Layers
 } from 'lucide-react';
 import { questions, TOTAL_QUESTIONS } from '@/lib/questions';
 import { getAttempts, saveSession, getIncorrectQuestionIds } from '@/lib/storage';
 import { QuizAttempt } from '@/lib/types';
+import { downloadRealPDF } from '@/lib/pdf';
 
 type Tab = 'home' | 'history' | 'incorrect' | 'correct';
 
@@ -289,8 +290,17 @@ export default function Home() {
                           </div>
                         ))}
                       </div>
-                      <div style={{ height: 5, borderRadius: '999px', background: '#F0EBF8', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', borderRadius: '999px', width: `${pct}%`, background: ac }} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                        <div style={{ flex: 1, height: 5, borderRadius: '999px', background: '#F0EBF8', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', borderRadius: '999px', width: `${pct}%`, background: ac }} />
+                        </div>
+                        <button onClick={() => downloadRealPDF(attempt)} style={{
+                          background: '#F5F0FF', border: '1.5px solid #E8DEFF', borderRadius: '8px', padding: '4px 8px',
+                          display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer',
+                          color: '#7B6A9E', fontSize: '10px', fontWeight: 700
+                        }}>
+                          <Download size={11} /> PDF
+                        </button>
                       </div>
                     </div>
                   );
